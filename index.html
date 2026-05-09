@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loop Five</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f0ede8;--surface:#fff;--surface2:#f5f2ee;--border:#ddd9d0;--text:#1a1a1a;--text-sub:#555;--tile:52px;--gap:4px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);min-height:100vh;font-family:'M PLUS Rounded 1c',sans-serif;color:var(--text);display:flex;flex-direction:column;align-items:center;padding:16px;user-select:none}
+h1{font-family:'Fredoka One',cursive;font-size:clamp(2rem,8vw,3rem);letter-spacing:.12em;background:linear-gradient(135deg,#e53935,#1565c0,#2e7d32,#f9a825);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px}
+.tagline{font-size:.75rem;letter-spacing:.2em;color:#888;text-transform:uppercase;margin-bottom:16px}
+#lobby-screen{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px;max-width:420px;width:100%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.1)}
+#lobby-screen h2{font-family:'Fredoka One',cursive;font-size:1.3rem;margin-bottom:20px;color:var(--text)}
+.lobby-section{margin-bottom:16px;text-align:left}
+.lobby-section label{font-size:.82rem;font-weight:700;color:var(--text-sub);display:block;margin-bottom:6px;letter-spacing:.05em}
+.lobby-input{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:'M PLUS Rounded 1c',sans-serif;font-size:1rem;outline:none;transition:border-color .2s}
+.lobby-input:focus{border-color:#1565c0}
+.divider{display:flex;align-items:center;gap:10px;margin:16px 0}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+.divider span{font-size:.8rem;color:#aaa;font-weight:700}
+.lobby-btn{width:100%;font-family:'Fredoka One',cursive;font-size:1.1rem;letter-spacing:.05em;padding:13px;border:none;border-radius:12px;cursor:pointer;transition:all .2s;margin-bottom:10px}
+.lobby-btn.primary{background:linear-gradient(135deg,#e53935,#f9a825);color:#fff;box-shadow:0 4px 16px rgba(229,57,53,.3)}
+.lobby-btn.primary:hover{transform:translateY(-2px)}
+.lobby-btn.secondary{background:var(--surface2);color:var(--text);border:1.5px solid var(--border)}
+.lobby-btn.secondary:hover{background:#ece9e0}
+.lobby-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.room-id-display{background:#f0f7ff;border:1.5px solid #1565c0;border-radius:10px;padding:12px;text-align:center;margin-bottom:12px;display:none}
+.rid-label{font-size:.75rem;color:#1565c0;font-weight:700;margin-bottom:4px;letter-spacing:.1em}
+.rid-value{font-family:'Fredoka One',cursive;font-size:2.4rem;letter-spacing:.25em;color:#1565c0}
+.rid-hint{font-size:.75rem;color:#888;margin-top:4px}
+.waiting-msg{font-size:.88rem;color:#888;margin-bottom:12px;display:none}
+.waiting-msg.show{display:block}
+.player-count-btns{display:flex;gap:10px;justify-content:center;margin-bottom:4px}
+.cnt-btn{width:56px;height:56px;border-radius:50%;border:2px solid var(--border);background:var(--surface2);color:var(--text);font-family:'Fredoka One',cursive;font-size:1.4rem;cursor:pointer;transition:all .2s}
+.cnt-btn:hover,.cnt-btn.selected{border-color:#1565c0;background:rgba(21,101,192,.08);color:#1565c0;transform:scale(1.1)}
+.status-msg{font-size:.85rem;color:#888;text-align:center;min-height:1.4em;margin-top:8px}
+.status-msg.error{color:#e53935}
+.status-msg.success{color:#2e7d32}
+#game-screen{display:none;width:100%;max-width:960px}
+.players-panel{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;justify-content:center}
+.player-card{display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:50px;border:2px solid var(--border);background:var(--surface);transition:all .3s;font-size:.85rem;color:var(--text);box-shadow:0 2px 6px rgba(0,0,0,.06)}
+.player-card.active{border-color:var(--pc);background:var(--pcbg);box-shadow:0 0 0 3px var(--pcglow),0 4px 14px rgba(0,0,0,.08);transform:scale(1.06)}
+.player-card.me .pname::after{content:'（あなた）';font-size:.7rem;color:var(--pc);margin-left:3px}
+.player-card.winner{animation:winPulse .6s ease infinite alternate}
+@keyframes winPulse{from{box-shadow:0 0 0 2px var(--pc)}to{box-shadow:0 0 0 6px var(--pc),0 0 24px var(--pcglow)}}
+.pc-dot{width:14px;height:14px;border-radius:4px;background:var(--pc);border:1.5px solid rgba(0,0,0,.1);flex-shrink:0}
+.tile-count{font-family:'Fredoka One',cursive;font-size:1rem;color:var(--pc)}
+.tile-count span{font-size:.7rem;color:var(--text-sub);margin-left:2px}
+.timer-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;justify-content:center}
+.timer-display{font-family:'Fredoka One',cursive;font-size:1.6rem;min-width:2.4em;text-align:center;color:var(--text);transition:color .3s}
+.timer-display.urgent{color:#e53935;animation:urgentPulse .4s ease infinite alternate}
+@keyframes urgentPulse{from{transform:scale(1)}to{transform:scale(1.18)}}
+.timer-bar-wrap{flex:1;max-width:260px;height:8px;background:rgba(0,0,0,.08);border-radius:4px;overflow:hidden}
+.timer-bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#1565c0,#2e7d32);transition:width .9s linear,background .3s}
+.timer-bar-fill.urgent{background:linear-gradient(90deg,#e53935,#f9a825)}
+.timer-mode-badge{font-size:.7rem;font-weight:800;letter-spacing:.08em;padding:3px 10px;border-radius:20px;background:#e53935;color:#fff;display:none}
+.timer-mode-badge.show{display:inline-block}
+.pick-msg{display:none;background:#fff8e1;border:1.5px solid #f9a825;border-radius:10px;padding:6px 14px;font-size:.85rem;font-weight:700;color:#b45309;text-align:center;margin-bottom:6px}
+.pick-msg.show{display:block}
+.confirm-bar{display:none;align-items:center;justify-content:center;gap:10px;margin-bottom:8px;padding:10px 16px;background:#f5f2ee;border:1.5px solid var(--border);border-radius:12px;font-size:.88rem;color:var(--text);font-weight:700}
+.confirm-bar.show{display:flex}
+.confirm-btn{font-family:'Fredoka One',cursive;font-size:.9rem;padding:7px 22px;border-radius:50px;border:none;cursor:pointer;transition:all .2s}
+.confirm-btn.ok{background:linear-gradient(135deg,#1565c0,#2e7d32);color:#fff}
+.confirm-btn.ok:hover{transform:scale(1.06)}
+.confirm-btn.cancel{background:var(--surface2);color:var(--text);border:1.5px solid var(--border)}
+.turn-msg{text-align:center;font-size:.92rem;font-weight:700;letter-spacing:.04em;margin-bottom:4px;min-height:1.4em;color:var(--text)}
+.not-your-turn{text-align:center;font-size:.8rem;color:#aaa;margin-bottom:6px;min-height:1.2em}
+.zoom-row{display:flex;align-items:center;gap:8px;justify-content:flex-end;margin-bottom:6px}
+.zoom-btn{width:32px;height:32px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:1.1rem;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;font-family:'Fredoka One',cursive}
+.zoom-btn:hover{background:var(--surface2);border-color:#aaa}
+.zoom-label{font-size:.75rem;color:var(--text-sub);min-width:3.2em;text-align:center;font-weight:700}
+.board-container{overflow:auto;background:#e8e4dc;border:1.5px solid var(--border);border-radius:16px;padding:10px;max-height:52vh;box-shadow:inset 0 2px 10px rgba(0,0,0,.08)}
+#board-grid{display:inline-grid;gap:var(--gap);transform-origin:top left;transition:transform .2s}
+.cell{width:var(--tile);height:var(--tile);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:default;transition:all .15s;position:relative}
+.cell.empty{background:rgba(255,255,255,.35);border:1.5px dashed rgba(0,0,0,.12)}
+.cell.placeable{background:rgba(255,255,255,.6);border:1.5px dashed rgba(0,0,0,.25);cursor:pointer}
+.cell.placeable:hover{background:#fff;border-color:rgba(0,0,0,.5);transform:scale(1.1);box-shadow:0 2px 10px rgba(0,0,0,.15)}
+.cell.has-tile{border:none;animation:tilePlace .25s cubic-bezier(.34,1.56,.64,1)}
+@keyframes tilePlace{from{transform:scale(.3);opacity:.2}to{transform:scale(1);opacity:1}}
+.cell.win-tile{animation:winFlash .35s ease infinite alternate;z-index:2}
+@keyframes winFlash{from{filter:brightness(1)}to{filter:brightness(1.3) drop-shadow(0 0 10px currentColor)}}
+.cell .tile-inner{width:88%;height:88%;border-radius:9px;box-shadow:0 3px 10px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(0,0,0,.15)}
+.cell.preview .tile-inner{opacity:.4;box-shadow:0 2px 8px rgba(0,0,0,.15),0 0 0 2.5px rgba(0,0,0,.4)}
+.cell.pickable{cursor:crosshair}
+.cell.pickable .tile-inner{animation:pickPulse .65s ease infinite alternate}
+@keyframes pickPulse{from{box-shadow:0 3px 10px rgba(0,0,0,.25),0 0 0 2px rgba(0,0,0,.3)}to{box-shadow:0 3px 14px rgba(0,0,0,.3),0 0 0 4px rgba(0,0,0,.7)}}
+.cell.random-placed .tile-inner{animation:randomPop .5s cubic-bezier(.34,1.56,.64,1)}
+@keyframes randomPop{from{transform:scale(0)}70%{transform:scale(1.3)}to{transform:scale(1)}}
+.controls{display:flex;gap:10px;margin-top:12px;justify-content:center;flex-wrap:wrap}
+.ctrl-btn{font-family:'M PLUS Rounded 1c',sans-serif;font-size:.85rem;font-weight:700;padding:8px 20px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;transition:all .2s;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.ctrl-btn:hover{background:var(--surface2);border-color:#aaa;transform:translateY(-1px)}
+.room-info{text-align:center;font-size:.75rem;color:#aaa;margin-top:8px;letter-spacing:.05em}
+#endgame-overlay{display:none;position:fixed;inset:0;z-index:150;pointer-events:none}
+#endgame-overlay.show{display:block}
+.confetti-piece{position:absolute;border-radius:2px;animation:confettiFall linear forwards}
+@keyframes confettiFall{0%{transform:translateY(-20px) rotate(0);opacity:1}100%{transform:translateY(110vh) rotate(720deg);opacity:0}}
+.win-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+.win-overlay.show{display:flex}
+.win-card{background:#fff;border:2px solid rgba(0,0,0,.08);border-radius:24px;padding:48px 56px;text-align:center;animation:popIn .5s cubic-bezier(.34,1.56,.64,1);box-shadow:0 30px 80px rgba(0,0,0,.25)}
+@keyframes popIn{from{transform:scale(.4) rotate(-5deg);opacity:0}to{transform:scale(1) rotate(0);opacity:1}}
+.win-emoji{font-size:3.5rem;margin-bottom:8px}
+.win-name{font-family:'Fredoka One',cursive;font-size:2.4rem;margin-bottom:6px}
+.win-sub{font-size:1rem;color:#888;margin-bottom:32px}
+.win-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.win-btn{font-family:'Fredoka One',cursive;font-size:1rem;padding:12px 32px;border-radius:50px;border:none;cursor:pointer;transition:all .2s}
+.win-btn.primary{background:linear-gradient(135deg,#e53935,#f9a825);color:#fff}
+.win-btn.secondary{background:var(--surface2);color:var(--text);border:1.5px solid var(--border)}
+.win-btn:hover{transform:translateY(-2px)}
+.rules-toggle{font-size:.75rem;color:#888;cursor:pointer;margin-top:8px;text-align:center}
+.rules-box{display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;font-size:.8rem;line-height:1.75;color:var(--text);margin-top:6px;max-width:520px}
+.rules-box.show{display:block}
+</style>
+</head>
+<body>
+<h1>Loop Five</h1>
+<div class="tagline">タイル5枚並べたら勝ち！ · オンライン対戦</div>
+
+<div id="lobby-screen">
+  <h2>ゲームに参加しよう</h2>
+  <div class="lobby-section">
+    <label>あなたの名前</label>
+    <input class="lobby-input" id="my-name" type="text" placeholder="名前を入力" maxlength="10" value="プレイヤー">
+  </div>
+  <div class="divider"><span>部屋を作る</span></div>
+  <div class="lobby-section">
+    <label>人数を選んでね</label>
+    <div class="player-count-btns">
+      <button class="cnt-btn selected" data-n="2">2</button>
+      <button class="cnt-btn" data-n="3">3</button>
+      <button class="cnt-btn" data-n="4">4</button>
+    </div>
+  </div>
+  <button class="lobby-btn primary" id="create-btn">🎮 部屋を作る</button>
+  <div class="room-id-display" id="room-id-display">
+    <div class="rid-label">ルームID</div>
+    <div class="rid-value" id="room-id-value">----</div>
+    <div class="rid-hint">このIDを友達に教えてね！</div>
+  </div>
+  <div class="waiting-msg" id="waiting-msg">👥 友達が参加するのを待ってます...</div>
+  <div class="divider"><span>部屋に参加する</span></div>
+  <div class="lobby-section">
+    <label>ルームIDを入力</label>
+    <input class="lobby-input" id="join-room-id" type="text" placeholder="例：ABCD" maxlength="6" style="text-transform:uppercase;letter-spacing:.2em;font-family:'Fredoka One',cursive;font-size:1.2rem;text-align:center">
+  </div>
+  <button class="lobby-btn secondary" id="join-btn">🚪 参加する</button>
+  <div class="status-msg" id="status-msg"></div>
+</div>
+
+<div id="game-screen">
+  <div class="players-panel" id="players-panel"></div>
+  <div class="timer-row">
+    <div class="timer-display" id="timer-display">30</div>
+    <div class="timer-bar-wrap"><div class="timer-bar-fill" id="timer-bar" style="width:100%"></div></div>
+    <div class="timer-mode-badge" id="timer-mode-badge">⚡ 15秒</div>
+  </div>
+  <div class="pick-msg" id="pick-msg">⚠️ タイルが15枚！自分のタイルを1枚選んで移動させよう</div>
+  <div class="confirm-bar" id="confirm-bar">
+    <span>ここに置く？</span>
+    <button class="confirm-btn ok" id="confirm-ok">✓ 確定</button>
+    <button class="confirm-btn cancel" id="confirm-cancel">✕ キャンセル</button>
+  </div>
+  <div class="turn-msg" id="turn-msg"></div>
+  <div class="not-your-turn" id="not-your-turn"></div>
+  <div class="zoom-row">
+    <button class="zoom-btn" id="zoom-out">－</button>
+    <span class="zoom-label" id="zoom-label">100%</span>
+    <button class="zoom-btn" id="zoom-in">＋</button>
+    <button class="zoom-btn" id="zoom-reset">⊙</button>
+  </div>
+  <div class="board-container"><div id="board-grid"></div></div>
+  <div class="room-info" id="room-info"></div>
+  <div class="controls">
+    <button class="ctrl-btn" id="leave-btn">🚪 退出する</button>
+  </div>
+  <div class="rules-toggle" id="rules-toggle">▼ ルールを見る</div>
+  <div class="rules-box" id="rules-box">
+    <b>ルール</b><br>
+    ① 自分の番に、場にあるタイルの<b>辺</b>に隣接する場所に1枚置く（最初はどこでもOK）<br>
+    ② タテ・ヨコ・ナナメで<b>5枚一列</b>になったら勝ち！<br>
+    ③ タイルが15枚になったら1枚抜いてから置く<br>
+    ④ 30秒以内に置かないとランダム配置。全員15枚出すと15秒に短縮！
+  </div>
+</div>
+
+<div id="endgame-overlay"></div>
+<div class="win-overlay" id="win-overlay">
+  <div class="win-card">
+    <div class="win-emoji" id="win-emoji">🎉</div>
+    <div class="win-name" id="win-name"></div>
+    <div class="win-sub">の勝ち！</div>
+    <div class="win-btns">
+      <button class="win-btn secondary" id="back-from-win-btn">ロビーに戻る</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL='https://ukimgdxxcnaxrqiwzygk.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVraW1nZHh4Y25heHJxaXd6eWdrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzQ3MDcsImV4cCI6MjA5Mzg1MDcwN30.1zAcleZBeMgc1XlcCcuJ5OZ7XpHLlDO61PkCAjyGL-0';
+const COLOR_VALS=['#e53935','#1565c0','#2e7d32','#f9a825'];
+const COLOR_BG=['rgba(229,57,53,.08)','rgba(21,101,192,.08)','rgba(46,125,50,.08)','rgba(249,168,37,.1)'];
+const COLOR_GLOW=['rgba(229,57,53,.3)','rgba(21,101,192,.3)','rgba(46,125,50,.3)','rgba(249,168,37,.35)'];
+const COLOR_NAMES=['赤','青','緑','黄'];
+const TILE_EMOJI=['🔴','🔵','🟢','🟡'];
+const MAX_TILES=15,TIME_NORMAL=30,TIME_ENDGAME=15;
+const TILE_PX=52,GAP_PX=4,MARGIN=3;
+const ZOOM_STEP=0.15,ZOOM_MIN=0.3,ZOOM_MAX=1.5;
+
+let myName='プレイヤー',myPlayerIndex=-1,numPlayers=2;
+let currentRoomId=null,roomDbId=null,isHost=false;
+let pollTimer=null;
+let board={},current=0,placedCounts=[],totalPlaced=[],playerNames=[];
+let gameOver=false,pickMode=false,pendingPlace=null,previewPos=null;
+let gridMinR,gridMaxR,gridMinC,gridMaxC;
+let timerSec=TIME_NORMAL,timerInterval=null,endgameMode=false,zoomLevel=1.0;
+let lastSyncKey='';
+
+async function sbFetch(path,opts={}){
+  const r=await fetch(SUPABASE_URL+'/rest/v1/'+path,{
+    ...opts,
+    headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':opts.prefer||'',...(opts.headers||{})}
+  });
+  const t=await r.text();
+  if(!r.ok)throw new Error(t);
+  return t?JSON.parse(t):null;
+}
+async function getRoom(id){const d=await sbFetch('rooms?room_id=eq.'+id+'&select=*');return d&&d[0];}
+async function createRoom(rid,np,names){
+  const d=await sbFetch('rooms',{method:'POST',prefer:'return=representation',body:JSON.stringify({room_id:rid,board:'{}',current_player:0,num_players:np,player_names:JSON.stringify(names),game_over:false})});
+  return d&&d[0];
+}
+async function updateRoom(id,patch){await sbFetch('rooms?id=eq.'+id,{method:'PATCH',body:JSON.stringify(patch)});}
+
+function startPolling(){
+  stopPolling();
+  pollTimer=setInterval(async()=>{
+    if(!currentRoomId)return;
+    try{const r=await getRoom(currentRoomId);if(r)onRoomUpdate(r);}catch(e){}
+  },2000);
+}
+function stopPolling(){if(pollTimer){clearInterval(pollTimer);pollTimer=null;}}
+
+function onRoomUpdate(room){
+  const key=room.board+'|'+room.current_player+'|'+room.game_over+'|'+room.player_names;
+  if(key===lastSyncKey)return;
+  lastSyncKey=key;
+  const names=JSON.parse(room.player_names||'[]');
+  numPlayers=room.num_players;
+  const filled=names.filter(n=>n).length;
+  if(document.getElementById('lobby-screen').style.display!=='none'){
+    if(filled===numPlayers){startGame(room);return;}
+    if(isHost){document.getElementById('waiting-msg').textContent=`👥 あと${numPlayers-filled}人待ってます...`;}
+    return;
+  }
+  syncFromRoom(room);
+}
+
+function syncFromRoom(room){
+  const newBoard=JSON.parse(room.board||'{}');
+  const newNames=JSON.parse(room.player_names||'[]');
+  playerNames=newNames;
+  board=newBoard;
+  gridMinR=-MARGIN;gridMaxR=MARGIN;gridMinC=-MARGIN;gridMaxC=MARGIN;
+  placedCounts=Array(numPlayers).fill(0);
+  for(const pi of Object.values(board)){if(pi>=0&&pi<numPlayers)placedCounts[pi]++;}
+  for(const key of Object.keys(board)){const[r,c]=key.split(',').map(Number);expandGrid(r,c);}
+  if(room.game_over&&!gameOver){
+    gameOver=true;clearInterval(timerInterval);
+    const winner=((room.current_player-1)+numPlayers)%numPlayers;
+    renderBoard();updatePlayerCards();
+    setTimeout(()=>{launchConfetti();showWin(winner);},400);
+    return;
+  }
+  if(current!==room.current_player){
+    current=room.current_player;
+    previewPos=null;pickMode=false;pendingPlace=null;
+    showConfirmBar(false);
+    document.getElementById('pick-msg').classList.remove('show');
+    checkEndgameMode();
+    if(isMyTurn())startTimer(endgameMode?TIME_ENDGAME:TIME_NORMAL);
+    else{clearInterval(timerInterval);updateTimerUI(endgameMode?TIME_ENDGAME:TIME_NORMAL);}
+  }
+  updatePlayerCards();updateTurnMsg();renderBoard();
+}
+
+document.querySelectorAll('.cnt-btn').forEach(b=>b.addEventListener('click',()=>{
+  numPlayers=parseInt(b.dataset.n);
+  document.querySelectorAll('.cnt-btn').forEach(x=>x.classList.remove('selected'));
+  b.classList.add('selected');
+}));
+
+function setStatus(msg,type=''){const e=document.getElementById('status-msg');e.textContent=msg;e.className='status-msg '+type;}
+function genId(){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<4;i++)s+=c[Math.floor(Math.random()*c.length)];return s;}
+
+document.getElementById('create-btn').addEventListener('click',async()=>{
+  myName=document.getElementById('my-name').value.trim()||'プレイヤー1';
+  myPlayerIndex=0;isHost=true;
+  const rid=genId();
+  const names=Array(numPlayers).fill('');names[0]=myName;
+  setStatus('部屋を作成中...','');
+  document.getElementById('create-btn').disabled=true;
+  try{
+    const room=await createRoom(rid,numPlayers,names);
+    roomDbId=room.id;currentRoomId=rid;
+    document.getElementById('room-id-value').textContent=rid;
+    document.getElementById('room-id-display').style.display='block';
+    document.getElementById('waiting-msg').classList.add('show');
+    setStatus('','');
+    startPolling();
+  }catch(e){
+    setStatus('エラーが発生しました。もう一度試してください。','error');
+    document.getElementById('create-btn').disabled=false;
+  }
+});
+
+document.getElementById('join-btn').addEventListener('click',async()=>{
+  myName=document.getElementById('my-name').value.trim()||'プレイヤー';
+  const rid=document.getElementById('join-room-id').value.trim().toUpperCase();
+  if(!rid||rid.length<4){setStatus('ルームIDを入力してください','error');return;}
+  setStatus('参加中...','');
+  try{
+    const room=await getRoom(rid);
+    if(!room){setStatus('部屋が見つかりません','error');return;}
+    const names=JSON.parse(room.player_names||'[]');
+    numPlayers=room.num_players;
+    const slot=names.findIndex(n=>!n);
+    if(slot===-1){setStatus('この部屋はすでに満員です','error');return;}
+    myPlayerIndex=slot;names[slot]=myName;
+    isHost=false;currentRoomId=rid;roomDbId=room.id;playerNames=names;
+    await updateRoom(roomDbId,{player_names:JSON.stringify(names)});
+    startPolling();
+    const filled=names.filter(n=>n).length;
+    if(filled===numPlayers){startGame({...room,player_names:JSON.stringify(names)});}
+    else{setStatus(`参加完了！あと${numPlayers-filled}人待ちです`,'success');}
+  }catch(e){setStatus('エラーが発生しました','error');console.error(e);}
+});
+
+function startGame(room){
+  playerNames=JSON.parse(room.player_names||'[]');
+  numPlayers=room.num_players;
+  board=JSON.parse(room.board||'{}');
+  current=room.current_player||0;
+  placedCounts=Array(numPlayers).fill(0);totalPlaced=Array(numPlayers).fill(0);
+  gameOver=false;pickMode=false;pendingPlace=null;previewPos=null;endgameMode=false;
+  gridMinR=-MARGIN;gridMaxR=MARGIN;gridMinC=-MARGIN;gridMaxC=MARGIN;
+  zoomLevel=1.0;
+  document.getElementById('lobby-screen').style.display='none';
+  document.getElementById('game-screen').style.display='block';
+  document.getElementById('room-info').textContent='ルームID: '+currentRoomId;
+  document.getElementById('timer-mode-badge').classList.remove('show');
+  applyZoom();renderPlayers();renderBoard();updateTurnMsg();
+  if(isMyTurn())startTimer(TIME_NORMAL);
+}
+
+function isMyTurn(){return current===myPlayerIndex&&!gameOver;}
+
+function renderPlayers(){
+  const p=document.getElementById('players-panel');p.innerHTML='';
+  for(let i=0;i<numPlayers;i++){
+    const c=document.createElement('div');
+    c.className='player-card'+(i===current?' active':'')+(i===myPlayerIndex?' me':'');
+    c.id='pcard-'+i;
+    c.style.setProperty('--pc',COLOR_VALS[i]);
+    c.style.setProperty('--pcbg',COLOR_BG[i]);
+    c.style.setProperty('--pcglow',COLOR_GLOW[i]);
+    c.innerHTML=`<div class="pc-dot" style="background:${COLOR_VALS[i]}"></div><span class="pname">${playerNames[i]||'待機中...'}</span><span class="tile-count">${placedCounts[i]}<span>/${MAX_TILES}</span></span>`;
+    p.appendChild(c);
+  }
+}
+function updatePlayerCards(){
+  for(let i=0;i<numPlayers;i++){
+    const c=document.getElementById('pcard-'+i);if(!c)continue;
+    c.className='player-card'+(i===current&&!gameOver?' active':'')+(i===myPlayerIndex?' me':'');
+    c.querySelector('.pname').textContent=playerNames[i]||'待機中...';
+    c.querySelector('.tile-count').innerHTML=`${placedCounts[i]}<span>/${MAX_TILES}</span>`;
+  }
+}
+function updateTurnMsg(){
+  const el=document.getElementById('turn-msg'),nt=document.getElementById('not-your-turn');
+  if(gameOver){el.textContent='';nt.textContent='';return;}
+  if(isMyTurn()){el.textContent='あなたの番です！（'+COLOR_NAMES[myPlayerIndex]+'）';el.style.color=COLOR_VALS[myPlayerIndex];nt.textContent='';}
+  else{el.textContent=(playerNames[current]||'...')+'（'+COLOR_NAMES[current]+'）の番';el.style.color=COLOR_VALS[current];nt.textContent='相手のターンです。お待ちください…';}
+}
+
+function startTimer(secs){
+  clearInterval(timerInterval);
+  if(!isMyTurn())return;
+  timerSec=secs;updateTimerUI(secs);
+  timerInterval=setInterval(()=>{
+    if(gameOver||!isMyTurn()){clearInterval(timerInterval);return;}
+    timerSec=Math.max(0,timerSec-1);
+    updateTimerUI(endgameMode?TIME_ENDGAME:TIME_NORMAL);
+    if(timerSec===0){clearInterval(timerInterval);doRandomPlace();}
+  },1000);
+}
+function updateTimerUI(total){
+  const d=document.getElementById('timer-display'),b=document.getElementById('timer-bar');
+  if(!isMyTurn()){d.textContent='–';b.style.width='100%';d.classList.remove('urgent');b.classList.remove('urgent');return;}
+  d.textContent=timerSec;b.style.width=(timerSec/total*100)+'%';
+  const u=timerSec<=(endgameMode?5:10);d.classList.toggle('urgent',u);b.classList.toggle('urgent',u);
+}
+function doRandomPlace(){
+  if(!isMyTurn()||gameOver)return;
+  if(pickMode||needsPickMode()){
+    const ok=Object.keys(board).filter(k=>board[k]===myPlayerIndex);
+    if(ok.length>0){const rk=ok[Math.floor(Math.random()*ok.length)];delete board[rk];placedCounts[myPlayerIndex]--;}
+    pickMode=false;pendingPlace=null;document.getElementById('pick-msg').classList.remove('show');
+  }
+  previewPos=null;showConfirmBar(false);
+  const cands=[...getPlaceableSet()];
+  if(!cands.length){pushTurn();return;}
+  const key=cands[Math.floor(Math.random()*cands.length)];
+  const[r,c]=key.split(',').map(Number);
+  document.getElementById('timer-display').textContent='⚡';
+  setTimeout(()=>placeTile(r,c,true),400);
+}
+
+function renderBoard(){
+  const grid=document.getElementById('board-grid');
+  const cols=gridMaxC-gridMinC+1,rows=gridMaxR-gridMinR+1;
+  grid.style.gridTemplateColumns=`repeat(${cols},${TILE_PX}px)`;
+  grid.style.width=(cols*(TILE_PX+GAP_PX)-GAP_PX)+'px';
+  grid.style.height=(rows*(TILE_PX+GAP_PX)-GAP_PX)+'px';
+  grid.innerHTML='';
+  const ps=getPlaceableSet();
+  for(let r=gridMinR;r<=gridMaxR;r++){
+    for(let c=gridMinC;c<=gridMaxC;c++){
+      const key=`${r},${c}`,cell=document.createElement('div');
+      cell.className='cell';cell.dataset.r=r;cell.dataset.c=c;
+      if(previewPos&&previewPos.r===r&&previewPos.c===c){
+        cell.classList.add('has-tile','preview');
+        const inn=document.createElement('div');inn.className='tile-inner';inn.style.background=COLOR_VALS[myPlayerIndex];cell.appendChild(inn);
+        cell.addEventListener('click',()=>{previewPos=null;showConfirmBar(false);renderBoard();});
+      }else if(board[key]!==undefined){
+        const pi=board[key];cell.classList.add('has-tile');
+        const inn=document.createElement('div');inn.className='tile-inner';inn.style.background=COLOR_VALS[pi];cell.appendChild(inn);
+        if(pickMode&&pi===myPlayerIndex){cell.classList.add('pickable');cell.addEventListener('click',onPickTile);}
+      }else if(isMyTurn()&&!pickMode&&!gameOver&&ps.has(key)){
+        cell.classList.add('placeable');cell.addEventListener('click',onPlaceClick);
+      }else{cell.classList.add('empty');}
+      grid.appendChild(cell);
+    }
+  }
+}
+function getPlaceableSet(){
+  const s=new Set();
+  if(!Object.keys(board).length){s.add('0,0');return s;}
+  for(const key of Object.keys(board)){
+    const[r,c]=key.split(',').map(Number);
+    for(const[dr,dc] of[[0,1],[0,-1],[1,0],[-1,0]]){const nk=`${r+dr},${c+dc}`;if(!board[nk])s.add(nk);}
+  }
+  return s;
+}
+function showConfirmBar(show){document.getElementById('confirm-bar').classList.toggle('show',show);}
+function onPlaceClick(e){
+  if(!isMyTurn()||pickMode)return;
+  const r=parseInt(e.currentTarget.dataset.r),c=parseInt(e.currentTarget.dataset.c);
+  if(previewPos&&previewPos.r===r&&previewPos.c===c)return;
+  previewPos={r,c};showConfirmBar(true);renderBoard();
+}
+function needsPickMode(){return placedCounts[myPlayerIndex]>=MAX_TILES;}
+document.getElementById('confirm-ok').addEventListener('click',()=>{
+  if(!previewPos||!isMyTurn())return;
+  const{r,c}=previewPos;
+  if(needsPickMode()){pickMode=true;pendingPlace={r,c};previewPos=null;showConfirmBar(false);document.getElementById('pick-msg').classList.add('show');document.getElementById('turn-msg').textContent='';renderBoard();return;}
+  placeTile(r,c);
+});
+document.getElementById('confirm-cancel').addEventListener('click',()=>{previewPos=null;showConfirmBar(false);renderBoard();});
+function onPickTile(e){
+  if(!pickMode)return;
+  const r=parseInt(e.currentTarget.dataset.r),c=parseInt(e.currentTarget.dataset.c);
+  delete board[`${r},${c}`];placedCounts[myPlayerIndex]--;pickMode=false;
+  document.getElementById('pick-msg').classList.remove('show');
+  if(pendingPlace){const{r:pr,c:pc}=pendingPlace;pendingPlace=null;placeTile(pr,pc);}
+  else{updateTurnMsg();renderBoard();}
+}
+function placeTile(r,c,isRandom=false){
+  previewPos=null;showConfirmBar(false);
+  board[`${r},${c}`]=myPlayerIndex;placedCounts[myPlayerIndex]++;
+  totalPlaced[myPlayerIndex]=(totalPlaced[myPlayerIndex]||0)+1;
+  expandGrid(r,c);renderBoard();
+  if(isRandom)setTimeout(()=>{document.querySelectorAll(`.cell[data-r="${r}"][data-c="${c}"]`).forEach(cl=>cl.classList.add('random-placed'));},30);
+  const wl=checkWin(r,c,myPlayerIndex);
+  if(wl){gameOver=true;clearInterval(timerInterval);highlightWin(wl);pushWin();return;}
+  checkEndgameMode();pushTurn();
+}
+async function pushTurn(){
+  const next=(myPlayerIndex+1)%numPlayers;
+  try{await updateRoom(roomDbId,{board:JSON.stringify(board),current_player:next});}catch(e){console.error(e);}
+}
+async function pushWin(){
+  try{
+    await updateRoom(roomDbId,{board:JSON.stringify(board),current_player:(myPlayerIndex+1)%numPlayers,game_over:true});
+    launchConfetti();showWin(myPlayerIndex);
+  }catch(e){console.error(e);}
+}
+function checkEndgameMode(){
+  if(endgameMode)return;
+  if(totalPlaced.every(t=>(t||0)>=MAX_TILES)){endgameMode=true;document.getElementById('timer-mode-badge').classList.add('show');}
+}
+function expandGrid(r,c){
+  if(r-MARGIN<gridMinR)gridMinR=r-MARGIN;if(r+MARGIN>gridMaxR)gridMaxR=r+MARGIN;
+  if(c-MARGIN<gridMinC)gridMinC=c-MARGIN;if(c+MARGIN>gridMaxC)gridMaxC=c+MARGIN;
+}
+function checkWin(r,c,pi){
+  for(const[dr,dc]of[[0,1],[1,0],[1,1],[1,-1]]){
+    const line=[[r,c]];
+    for(let i=1;i<5;i++){const nr=r+dr*i,nc=c+dc*i;if(board[`${nr},${nc}`]!==pi)break;line.push([nr,nc]);}
+    for(let i=1;i<5;i++){const nr=r-dr*i,nc=c-dc*i;if(board[`${nr},${nc}`]!==pi)break;line.push([nr,nc]);}
+    if(line.length>=5)return line;
+  }
+  return null;
+}
+function highlightWin(line){
+  for(const[r,c]of line)document.querySelectorAll(`.cell[data-r="${r}"][data-c="${c}"]`).forEach(cl=>cl.classList.add('win-tile'));
+}
+function launchConfetti(){
+  const ov=document.getElementById('endgame-overlay');ov.classList.add('show');ov.innerHTML='';
+  for(let i=0;i<80;i++){
+    const p=document.createElement('div');p.className='confetti-piece';
+    const col=COLOR_VALS[Math.floor(Math.random()*COLOR_VALS.length)];
+    p.style.cssText=`left:${Math.random()*100}vw;top:-10px;width:${8+Math.random()*10}px;height:${8+Math.random()*10}px;background:${col};border-radius:${Math.random()>.5?'50%':'2px'};animation-duration:${1.8+Math.random()*1.5}s;animation-delay:${Math.random()*1.2}s;`;
+    ov.appendChild(p);
+  }
+  setTimeout(()=>{ov.classList.remove('show');ov.innerHTML='';},4000);
+}
+function showWin(pi){
+  document.getElementById('win-name').textContent=playerNames[pi]||'プレイヤー'+(pi+1);
+  document.getElementById('win-name').style.color=COLOR_VALS[pi];
+  document.getElementById('win-emoji').textContent=TILE_EMOJI[pi];
+  document.getElementById('win-overlay').classList.add('show');
+  document.getElementById('pcard-'+pi)?.classList.add('winner');
+}
+function applyZoom(){
+  document.getElementById('board-grid').style.transform=`scale(${zoomLevel})`;
+  document.getElementById('zoom-label').textContent=Math.round(zoomLevel*100)+'%';
+}
+document.getElementById('zoom-in').addEventListener('click',()=>{zoomLevel=Math.min(ZOOM_MAX,parseFloat((zoomLevel+ZOOM_STEP).toFixed(2)));applyZoom();});
+document.getElementById('zoom-out').addEventListener('click',()=>{zoomLevel=Math.max(ZOOM_MIN,parseFloat((zoomLevel-ZOOM_STEP).toFixed(2)));applyZoom();});
+document.getElementById('zoom-reset').addEventListener('click',()=>{zoomLevel=1.0;applyZoom();});
+function leaveGame(){
+  stopPolling();clearInterval(timerInterval);
+  currentRoomId=null;roomDbId=null;isHost=false;lastSyncKey='';
+  document.getElementById('game-screen').style.display='none';
+  document.getElementById('win-overlay').classList.remove('show');
+  document.getElementById('lobby-screen').style.display='block';
+  document.getElementById('room-id-display').style.display='none';
+  document.getElementById('waiting-msg').classList.remove('show');
+  document.getElementById('create-btn').disabled=false;
+  document.getElementById('join-room-id').value='';
+  setStatus('','');
+}
+document.getElementById('leave-btn').addEventListener('click',leaveGame);
+document.getElementById('back-from-win-btn').addEventListener('click',leaveGame);
+document.getElementById('rules-toggle').addEventListener('click',()=>{
+  const b=document.getElementById('rules-box');b.classList.toggle('show');
+  document.getElementById('rules-toggle').textContent=b.classList.contains('show')?'▲ ルールを閉じる':'▼ ルールを見る';
+});
+</script>
+</body>
+</html>
+完了
