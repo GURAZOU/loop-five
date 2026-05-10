@@ -86,8 +86,8 @@ h1{font-family:'Fredoka One',cursive;font-size:clamp(2rem,8vw,3rem);letter-spaci
 .cell.pickable{cursor:crosshair}
 .cell.pickable .tile-inner{animation:pickPulse .65s ease infinite alternate}
 @keyframes pickPulse{from{box-shadow:0 3px 10px rgba(0,0,0,.25),0 0 0 2px rgba(0,0,0,.3)}to{box-shadow:0 3px 14px rgba(0,0,0,.3),0 0 0 4px rgba(0,0,0,.7)}}
-.cell.last-move .tile-inner{box-shadow:0 3px 10px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.5),0 0 0 3px #fff,0 0 0 5px rgba(0,0,0,.6)!important}
-.cell.last-move::after{content:'直前';position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:800;color:#fff;background:rgba(0,0,0,.75);padding:2px 5px;border-radius:4px;white-space:nowrap;pointer-events:none;letter-spacing:.02em}
+.cell.last-move .tile-inner{box-shadow:0 3px 10px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.5),0 0 0 3px rgba(0,0,0,.7)!important}
+.cell.last-move::after{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.9);pointer-events:none;box-shadow:0 0 4px rgba(0,0,0,.5)}
 .cell.random-placed .tile-inner{animation:randomPop .5s cubic-bezier(.34,1.56,.64,1)}
 @keyframes randomPop{from{transform:scale(0)}70%{transform:scale(1.3)}to{transform:scale(1)}}
 .controls{display:flex;gap:10px;margin-top:12px;justify-content:center;flex-wrap:wrap}
@@ -257,36 +257,11 @@ function onRoomUpdate(room){
   numPlayers=room.num_players;
   const filled=names.filter(n=>n).length;
   if(document.getElementById('lobby-screen').style.display!=='none'){
-    if(filled===numPlayers){
-      // ホストがランダム順番を決めてDBに保存してからゲーム開始
-      if(isHost){
-        shuffleAndStart(room,names);
-      } else {
-        startGame(room);
-      }
-      return;
-    }
+    if(filled===numPlayers){startGame(room);return;}
     if(isHost){document.getElementById('waiting-msg').textContent=`👥 あと${numPlayers-filled}人待ってます...`;}
     return;
   }
   syncFromRoom(room);
-}
-
-async function shuffleAndStart(room, names) {
-  // プレイヤー順をシャッフル
-  const order = Array.from({length:numPlayers},(_,i)=>i);
-  for(let i=order.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
-  const shuffledNames = order.map(i=>names[i]);
-  // 自分のインデックスを更新
-  const myOldIndex = myPlayerIndex;
-  myPlayerIndex = order.indexOf(myOldIndex);
-  // DBに保存
-  try {
-    await updateRoom(roomDbId, {player_names: JSON.stringify(shuffledNames), current_player: 0});
-    startGame({...room, player_names: JSON.stringify(shuffledNames), current_player: 0});
-  } catch(e) {
-    startGame(room);
-  }
 }
 
 function syncFromRoom(room){
@@ -378,11 +353,6 @@ function startGame(room){
   numPlayers=room.num_players;
   board=JSON.parse(room.board||'{}');
   current=room.current_player||0;
-  // 非ホストは名前からインデックスを特定
-  if(!isHost){
-    const idx=playerNames.indexOf(myName);
-    if(idx!==-1)myPlayerIndex=idx;
-  }
   placedCounts=Array(numPlayers).fill(0);totalPlaced=Array(numPlayers).fill(0);
   gameOver=false;pickMode=false;pendingPlace=null;previewPos=null;endgameMode=false;
   gridMinR=-MARGIN;gridMaxR=MARGIN;gridMinC=-MARGIN;gridMaxC=MARGIN;
@@ -477,7 +447,7 @@ function renderBoard(){
       }else if(board[key]!==undefined){
         const pi=board[key];cell.classList.add('has-tile');
         const inn=document.createElement('div');inn.className='tile-inner';inn.style.background=COLOR_VALS[pi];cell.appendChild(inn);
-        if(lastMove&&lastMove.r===r&&lastMove.c===c&&lastMove.pi!==myPlayerIndex)cell.classList.add('last-move');
+        if(lastMove&&lastMove.r===r&&lastMove.c===c)cell.classList.add('last-move');
         if(pickMode&&pi===myPlayerIndex){cell.classList.add('pickable');cell.addEventListener('click',onPickTile);}
       }else if(isMyTurn()&&!pickMode&&!gameOver&&ps.has(key)){
         cell.classList.add('placeable');cell.addEventListener('click',onPlaceClick);
