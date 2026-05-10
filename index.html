@@ -312,7 +312,9 @@ document.getElementById('create-btn').addEventListener('click',async()=>{
   myName=document.getElementById('my-name').value.trim()||'プレイヤー1';
   myPlayerIndex=0;isHost=true;
   const rid=genId();
-  const names=Array(numPlayers).fill('');names[0]=myName;
+  // 最初のスロットだけ自分の名前、残りは空文字で初期化
+  const names=Array(numPlayers).fill('');
+  names[0]=myName;
   setStatus('部屋を作成中...','');
   document.getElementById('create-btn').disabled=true;
   try{
@@ -321,6 +323,7 @@ document.getElementById('create-btn').addEventListener('click',async()=>{
     document.getElementById('room-id-value').textContent=rid;
     document.getElementById('room-id-display').style.display='block';
     document.getElementById('waiting-msg').classList.add('show');
+    document.getElementById('waiting-msg').textContent=`👥 あと${numPlayers-1}人待ってます...`;
     setStatus('','');
     startPolling();
   }catch(e){
@@ -337,15 +340,22 @@ document.getElementById('join-btn').addEventListener('click',async()=>{
   try{
     const room=await getRoom(rid);
     if(!room){setStatus('部屋が見つかりません','error');return;}
+    if(room.game_over){setStatus('このゲームはすでに終了しています','error');return;}
     const names=JSON.parse(room.player_names||'[]');
     numPlayers=room.num_players;
-    const slot=names.findIndex(n=>!n);
+    // 空スロットを探す（空文字またはnullのスロット）
+    const slot=names.findIndex(n=>!n||n==='');
     if(slot===-1){setStatus('この部屋はすでに満員です','error');return;}
     myPlayerIndex=slot;names[slot]=myName;
     isHost=false;currentRoomId=rid;roomDbId=room.id;playerNames=names;
     await updateRoom(roomDbId,{player_names:JSON.stringify(names)});
     startPolling();
-    setStatus('参加完了！ゲーム開始を待ってます...','success');
+    const filled=names.filter(n=>n&&n.length>0).length;
+    if(filled>=numPlayers){
+      startGame({...room,player_names:JSON.stringify(names)});
+    }else{
+      setStatus(`参加完了！あと${numPlayers-filled}人待ちです`,'success');
+    }
   }catch(e){setStatus('エラーが発生しました','error');console.error(e);}
 });
 
