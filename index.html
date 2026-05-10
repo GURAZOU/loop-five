@@ -279,14 +279,13 @@ function onRoomUpdate(room){
   lastSyncKey=key;
   const names=JSON.parse(room.player_names||'[]');
   numPlayers=room.num_players;
-  const filled=names.filter(n=>n&&!n.startsWith('__')||n&&n.startsWith('__ready__')).length;
 
   // ゲーム画面が開いていれば同期
   if(document.getElementById('game-screen').style.display!=='none'){
     syncFromRoom(room);return;
   }
 
-  // ゲーム開始済み（boardにデータあり）
+  // ゲーム開始済みチェック
   const boardObj=JSON.parse(room.board||'{}');
   const isStarted=boardObj.started===true||Object.keys(boardObj).some(k=>k.includes(','));
   if(isStarted){
@@ -298,9 +297,9 @@ function onRoomUpdate(room){
     syncReadyScreen(room);return;
   }
 
-  // 全員揃ったら準備画面へ
-  const totalFilled=names.filter(n=>n).length;
-  if(totalFilled===numPlayers){
+  // 全員揃ったか（名前が空でないスロット数）
+  const totalFilled=names.filter(n=>n&&n.length>0).length;
+  if(totalFilled>=numPlayers){
     showReadyScreen(room);return;
   }
 
