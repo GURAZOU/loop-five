@@ -11,23 +11,6 @@
 body{background:var(--bg);min-height:100vh;font-family:'M PLUS Rounded 1c',sans-serif;color:var(--text);display:flex;flex-direction:column;align-items:center;padding:16px;user-select:none}
 h1{font-family:'Fredoka One',cursive;font-size:clamp(2rem,8vw,3rem);letter-spacing:.12em;background:linear-gradient(135deg,#e53935,#1565c0,#2e7d32,#f9a825);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px}
 .tagline{font-size:.75rem;letter-spacing:.2em;color:#888;text-transform:uppercase;margin-bottom:16px}
-#ready-screen{display:none;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px;max-width:420px;width:100%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.1)}
-#ready-screen h2{font-family:'Fredoka One',cursive;font-size:1.3rem;margin-bottom:6px;color:var(--text)}
-.ready-sub{font-size:.82rem;color:#888;margin-bottom:20px}
-.ready-list{display:flex;flex-direction:column;gap:10px;margin-bottom:20px;text-align:left}
-.ready-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;border:2px solid var(--border);background:var(--surface2);transition:all .3s}
-.ready-row.is-ready{border-color:var(--rc);background:var(--rcbg)}
-.ready-row .r-dot{width:14px;height:14px;border-radius:4px;flex-shrink:0}
-.ready-row .r-name{flex:1;font-weight:700;font-size:.9rem}
-.ready-row .r-status{font-size:.8rem;color:#aaa;font-weight:700}
-.ready-row.is-ready .r-status{color:var(--rc)}
-.ready-btn{width:100%;font-family:'Fredoka One',cursive;font-size:1.1rem;padding:13px;border:none;border-radius:12px;cursor:pointer;transition:all .2s;margin-bottom:10px}
-.ready-btn.do-ready{background:linear-gradient(135deg,#2e7d32,#1565c0);color:#fff;box-shadow:0 4px 16px rgba(46,125,50,.3)}
-.ready-btn.do-ready:hover{transform:translateY(-2px)}
-.ready-btn.do-ready:disabled{opacity:.5;cursor:not-allowed;transform:none}
-.ready-btn.do-start{background:linear-gradient(135deg,#e53935,#f9a825);color:#fff;box-shadow:0 4px 16px rgba(229,57,53,.3);display:none}
-.ready-btn.do-start:hover{transform:translateY(-2px)}
-.ready-btn.do-start.show{display:block}
 #lobby-screen h2{font-family:'Fredoka One',cursive;font-size:1.3rem;margin-bottom:20px;color:var(--text)}
 .lobby-section{margin-bottom:16px;text-align:left}
 .lobby-section label{font-size:.82rem;font-weight:700;color:var(--text-sub);display:block;margin-bottom:6px;letter-spacing:.05em}
@@ -164,15 +147,6 @@ h1{font-family:'Fredoka One',cursive;font-size:clamp(2rem,8vw,3rem);letter-spaci
   <div class="status-msg" id="status-msg"></div>
 </div>
 
-<div id="ready-screen">
-  <h2>順番を決めよう！</h2>
-  <div class="ready-sub">準備ができたら「準備OK」を押してね。全員OKになったらホストがスタートできるよ！</div>
-  <div class="ready-list" id="ready-list"></div>
-  <button class="ready-btn do-ready" id="ready-btn">✅ 準備OK！</button>
-  <button class="ready-btn do-start" id="start-game-btn">🎮 ゲームスタート！</button>
-  <div class="status-msg" id="ready-status-msg"></div>
-</div>
-
 <div id="game-screen">
   <div class="players-panel" id="players-panel"></div>
   <div class="timer-row">
@@ -246,7 +220,6 @@ let gridMinR,gridMaxR,gridMinC,gridMaxC;
 let timerSec=TIME_NORMAL,timerInterval=null,endgameMode=false,zoomLevel=1.0;
 let lastSyncKey='';
 let lastMoves={}; // {playerIndex: {r,c}} 各プレイヤーの最後の手
-let readyStates={};
 
 async function sbFetch(path,opts={}){
   const r=await fetch(SUPABASE_URL+'/rest/v1/'+path,{
@@ -279,38 +252,22 @@ function onRoomUpdate(room){
   lastSyncKey=key;
   const names=JSON.parse(room.player_names||'[]');
   numPlayers=room.num_players;
+  const filled=names.filter(n=>n&&n.length>0).length;
 
-  // ゲーム画面が開いていれば同期
   if(document.getElementById('game-screen').style.display!=='none'){
     syncFromRoom(room);return;
   }
-
-  // ゲーム開始済みチェック
-  const boardObj=JSON.parse(room.board||'{}');
-  const isStarted=boardObj.started===true||Object.keys(boardObj).some(k=>k.includes(','));
-  if(isStarted){
+  if(filled>=numPlayers){
     startGame(room);return;
   }
-
-  // 準備画面が開いていれば更新
-  if(document.getElementById('ready-screen').style.display!=='none'){
-    syncReadyScreen(room);return;
-  }
-
-  // 全員揃ったか
-  const totalFilled=names.filter(n=>n&&n.length>0).length;
-  if(totalFilled>=numPlayers){
-    showReadyScreen(room);return;
-  }
-
-  if(isHost){document.getElementById('waiting-msg').textContent=`👥 あと${numPlayers-totalFilled}人待ってます...`;}
+  if(isHost){document.getElementById('waiting-msg').textContent=`👥 あと${numPlayers-filled}人待ってます...`;}
 }
 
 function syncFromRoom(room){
   const newBoard=JSON.parse(room.board||'{}');
   const isStartSignal=newBoard.started===true&&Object.keys(newBoard).length===1;
   const newNames=JSON.parse(room.player_names||'[]');
-  playerNames=newNames.map(n=>(n||'').replace('__ready__',''));
+  playerNames=newNames;
   board=isStartSignal?{}:newBoard;
   gridMinR=-MARGIN;gridMaxR=MARGIN;gridMinC=-MARGIN;gridMaxC=MARGIN;
   placedCounts=Array(numPlayers).fill(0);
@@ -388,65 +345,12 @@ document.getElementById('join-btn').addEventListener('click',async()=>{
     isHost=false;currentRoomId=rid;roomDbId=room.id;playerNames=names;
     await updateRoom(roomDbId,{player_names:JSON.stringify(names)});
     startPolling();
-    const filled=names.filter(n=>n).length;
-    if(filled===numPlayers){
-      showReadyScreen({...room,player_names:JSON.stringify(names)});
-    }else{
-      setStatus(`参加完了！あと${numPlayers-filled}人待ちです`,'success');
-    }
+    setStatus('参加完了！ゲーム開始を待ってます...','success');
   }catch(e){setStatus('エラーが発生しました','error');console.error(e);}
 });
 
-function showReadyScreen(room){
-  playerNames=JSON.parse(room.player_names||'[]');
-  readyStates={};
-  document.getElementById('lobby-screen').style.display='none';
-  document.getElementById('ready-screen').style.display='block';
-  renderReadyList();
-}
-
-function syncReadyScreen(room){
-  const names=JSON.parse(room.player_names||'[]');
-  playerNames=names;
-  readyStates={};
-  names.forEach((n,i)=>{
-    if(n&&n.startsWith('__ready__'))readyStates[i]=true;
-  });
-  renderReadyList();
-  const allReady=Array.from({length:numPlayers},(_,i)=>i).every(i=>readyStates[i]);
-  if(allReady){
-    if(isHost){
-      document.getElementById('start-game-btn').classList.add('show');
-      document.getElementById('ready-status-msg').textContent='全員準備OK！スタートボタンを押してね';
-      document.getElementById('ready-status-msg').className='status-msg success';
-    } else {
-      document.getElementById('ready-status-msg').textContent='全員準備OK！ホストのスタートを待ってます...';
-      document.getElementById('ready-status-msg').className='status-msg success';
-    }
-  }
-}
-
-function renderReadyList(){
-  const list=document.getElementById('ready-list');
-  list.innerHTML='';
-  for(let i=0;i<numPlayers;i++){
-    const isReady=!!readyStates[i];
-    const name=(playerNames[i]||'').replace('__ready__','');
-    const row=document.createElement('div');
-    row.className='ready-row'+(isReady?' is-ready':'');
-    row.style.setProperty('--rc',COLOR_VALS[i]);
-    row.style.setProperty('--rcbg',COLOR_BG[i]);
-    row.innerHTML=`<div class="r-dot" style="background:${COLOR_VALS[i]}"></div>
-      <span class="r-name">${name||'待機中...'}</span>
-      <span class="r-status">${isReady?'✅ 準備OK':'⏳ 待機中'}</span>`;
-    list.appendChild(row);
-  }
-}
-
 function startGame(room){
-  // __ready__プレフィックスを除去した名前を使う
-  const rawNames=JSON.parse(room.player_names||'[]');
-  playerNames=rawNames.map(n=>(n||'').replace('__ready__',''));
+  playerNames=JSON.parse(room.player_names||'[]');
   numPlayers=room.num_players;
   board=JSON.parse(room.board||'{}');
   current=room.current_player||0;
@@ -455,7 +359,6 @@ function startGame(room){
   gridMinR=-MARGIN;gridMaxR=MARGIN;gridMinC=-MARGIN;gridMaxC=MARGIN;
   zoomLevel=1.0;
   document.getElementById('lobby-screen').style.display='none';
-  document.getElementById('ready-screen').style.display='none';
   document.getElementById('game-screen').style.display='block';
   document.getElementById('room-info').textContent='ルームID: '+currentRoomId;
   document.getElementById('timer-mode-badge').classList.remove('show');
@@ -653,60 +556,16 @@ document.getElementById('zoom-out').addEventListener('click',()=>{zoomLevel=Math
 document.getElementById('zoom-reset').addEventListener('click',()=>{zoomLevel=1.0;applyZoom();});
 function leaveGame(){
   stopPolling();clearInterval(timerInterval);
-  currentRoomId=null;roomDbId=null;isHost=false;lastSyncKey='';readyStates={};
+  currentRoomId=null;roomDbId=null;isHost=false;lastSyncKey='';
   document.getElementById('game-screen').style.display='none';
-  document.getElementById('ready-screen').style.display='none';
   document.getElementById('win-overlay').classList.remove('show');
   document.getElementById('lobby-screen').style.display='block';
   document.getElementById('room-id-display').style.display='none';
   document.getElementById('waiting-msg').classList.remove('show');
   document.getElementById('create-btn').disabled=false;
-  document.getElementById('ready-btn').disabled=false;
-  document.getElementById('start-game-btn').classList.remove('show');
   document.getElementById('join-room-id').value='';
   setStatus('','');
 }
-// 準備OKボタン
-document.getElementById('ready-btn').addEventListener('click',async()=>{
-  document.getElementById('ready-btn').disabled=true;
-  try{
-    const room=await getRoom(currentRoomId);
-    const names=JSON.parse(room.player_names||'[]');
-    names[myPlayerIndex]='__ready__'+myName;
-    readyStates[myPlayerIndex]=true;
-    await updateRoom(roomDbId,{player_names:JSON.stringify(names)});
-    renderReadyList();
-    document.getElementById('ready-status-msg').textContent='準備OK！他の人を待ってます...';
-    document.getElementById('ready-status-msg').className='status-msg success';
-  }catch(e){
-    document.getElementById('ready-btn').disabled=false;
-    document.getElementById('ready-status-msg').textContent='エラーが発生しました';
-    document.getElementById('ready-status-msg').className='status-msg error';
-  }
-});
-
-// ゲームスタートボタン（ホストのみ）
-document.getElementById('start-game-btn').addEventListener('click',async()=>{
-  if(!isHost)return;
-  const allReady=Array.from({length:numPlayers},(_,i)=>i).every(i=>readyStates[i]);
-  if(!allReady){
-    document.getElementById('ready-status-msg').textContent='まだ準備できていない人がいます！';
-    document.getElementById('ready-status-msg').className='status-msg error';
-    return;
-  }
-  try{
-    const cleanNames=playerNames.map(n=>n.replace('__ready__',''));
-    await updateRoom(roomDbId,{
-      player_names:JSON.stringify(cleanNames),
-      board:'{"started":true}',
-      current_player:0
-    });
-  }catch(e){
-    document.getElementById('ready-status-msg').textContent='エラーが発生しました';
-    document.getElementById('ready-status-msg').className='status-msg error';
-  }
-});
-
 document.getElementById('leave-btn').addEventListener('click',leaveGame);
 document.getElementById('back-from-win-btn').addEventListener('click',leaveGame);
 document.getElementById('rules-toggle').addEventListener('click',()=>{
