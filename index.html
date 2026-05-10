@@ -297,7 +297,7 @@ function onRoomUpdate(room){
     syncReadyScreen(room);return;
   }
 
-  // 全員揃ったか（名前が空でないスロット数）
+  // 全員揃ったか
   const totalFilled=names.filter(n=>n&&n.length>0).length;
   if(totalFilled>=numPlayers){
     showReadyScreen(room);return;
@@ -408,15 +408,21 @@ function showReadyScreen(room){
 function syncReadyScreen(room){
   const names=JSON.parse(room.player_names||'[]');
   playerNames=names;
-  // ready状態はplayer_namesに __ready__ プレフィックスで保存
   readyStates={};
-  names.forEach((n,i)=>{ if(n&&n.startsWith('__ready__'))readyStates[i]=true; });
+  names.forEach((n,i)=>{
+    if(n&&n.startsWith('__ready__'))readyStates[i]=true;
+  });
   renderReadyList();
   const allReady=Array.from({length:numPlayers},(_,i)=>i).every(i=>readyStates[i]);
-  if(isHost&&allReady){
-    document.getElementById('start-game-btn').classList.add('show');
-    document.getElementById('ready-status-msg').textContent='全員準備OK！スタートボタンを押してね';
-    document.getElementById('ready-status-msg').className='status-msg success';
+  if(allReady){
+    if(isHost){
+      document.getElementById('start-game-btn').classList.add('show');
+      document.getElementById('ready-status-msg').textContent='全員準備OK！スタートボタンを押してね';
+      document.getElementById('ready-status-msg').className='status-msg success';
+    } else {
+      document.getElementById('ready-status-msg').textContent='全員準備OK！ホストのスタートを待ってます...';
+      document.getElementById('ready-status-msg').className='status-msg success';
+    }
   }
 }
 
