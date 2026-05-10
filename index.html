@@ -279,26 +279,32 @@ function onRoomUpdate(room){
   lastSyncKey=key;
   const names=JSON.parse(room.player_names||'[]');
   numPlayers=room.num_players;
-  const filled=names.filter(n=>n&&!n.startsWith('__')).length;
+  const filled=names.filter(n=>n&&!n.startsWith('__')||n&&n.startsWith('__ready__')).length;
 
   // ゲーム画面が開いていれば同期
   if(document.getElementById('game-screen').style.display!=='none'){
     syncFromRoom(room);return;
   }
 
-  // 準備画面が開いていれば更新
-  if(document.getElementById('ready-screen').style.display!=='none'){
-    syncReadyScreen(room);
-    // ゲーム開始フラグ確認
-    if(room.board!=='{}'){startGame(room);}
-    return;
+  // ゲーム開始済み（boardにデータあり）
+  const boardObj=JSON.parse(room.board||'{}');
+  const isStarted=boardObj.started===true||Object.keys(boardObj).some(k=>k.includes(','));
+  if(isStarted){
+    startGame(room);return;
   }
 
-  // ロビー画面
-  if(filled===numPlayers){
+  // 準備画面が開いていれば更新
+  if(document.getElementById('ready-screen').style.display!=='none'){
+    syncReadyScreen(room);return;
+  }
+
+  // 全員揃ったら準備画面へ
+  const totalFilled=names.filter(n=>n).length;
+  if(totalFilled===numPlayers){
     showReadyScreen(room);return;
   }
-  if(isHost){document.getElementById('waiting-msg').textContent=`👥 あと${numPlayers-filled}人待ってます...`;}
+
+  if(isHost){document.getElementById('waiting-msg').textContent=`👥 あと${numPlayers-totalFilled}人待ってます...`;}
 }
 
 function syncFromRoom(room){
@@ -384,8 +390,11 @@ document.getElementById('join-btn').addEventListener('click',async()=>{
     await updateRoom(roomDbId,{player_names:JSON.stringify(names)});
     startPolling();
     const filled=names.filter(n=>n).length;
-    if(filled===numPlayers){startGame({...room,player_names:JSON.stringify(names)});}
-    else{setStatus(`参加完了！あと${numPlayers-filled}人待ちです`,'success');}
+    if(filled===numPlayers){
+      showReadyScreen({...room,player_names:JSON.stringify(names)});
+    }else{
+      setStatus(`参加完了！あと${numPlayers-filled}人待ちです`,'success');
+    }
   }catch(e){setStatus('エラーが発生しました','error');console.error(e);}
 });
 
