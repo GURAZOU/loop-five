@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Loop Five</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#f0ede8;--surface:#fff;--surface2:#f5f2ee;--border:#ddd9d0;--text:#1a1a1a;--text-sub:#555;--tile:52px;--gap:4px}
@@ -237,6 +238,9 @@ const SUPABASE_URL = 'https://ukimgdxxcnaxrqiwzygk.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVraW1nZHh4Y25heHJxaXd6eWdrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzQ3MDcsImV4cCI6MjA5Mzg1MDcwN30.1zAcleZBeMgc1XlcCcuJ5OZ7XpHLlDO61PkCAjyGL-0';
 
 const COLOR_VALS  = ['#e53935','#1565c0','#2e7d32','#f9a825'];
+
+// Supabase クライアント初期化（Realtimeで使用）
+window._supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const COLOR_BG    = ['rgba(229,57,53,.08)','rgba(21,101,192,.08)','rgba(46,125,50,.08)','rgba(249,168,37,.1)'];
 const COLOR_GLOW  = ['rgba(229,57,53,.3)','rgba(21,101,192,.3)','rgba(46,125,50,.3)','rgba(249,168,37,.35)'];
 const COLOR_NAMES = ['赤','青','緑','黄'];
@@ -396,82 +400,51 @@ async function updateRoom(id, patch) {
 }
 
 // ══════════════════════════════════════════
-// Supabase Realtime 接続
+// Supabase Realtime 接続（公式ライブラリ使用）
 // ══════════════════════════════════════════
+// @supabase/supabase-js を CDN から読み込み済み（head内）
 function connectRealtime(roomId) {
   disconnectRealtime();
   setBadge('connecting', '⏳ 接続中...');
 
-  // Supabase Realtime v2 (ブロードキャスト & DB変更監視)
-  // WebSocketで rooms テーブルのUPDATEを監視
-  const wsUrl = SUPABASE_URL.replace('https://', 'wss://')
-    + '/realtime/v1/websocket?apikey=' + SUPABASE_KEY + '&vsn=1.0.0';
-
-  let ws;
-  let heartbeatTimer;
-  let reconnectTimer;
-  let joined = false;
-
-  function connect() {
-    try { ws = new WebSocket(wsUrl); } catch(e) { fallbackPolling(roomId); return; }
-
-    ws.onopen = () => {
-      setBadge('ok', '🟢 接続中');
-      joined = false;
-      // チャンネルjoin
-      ws.send(JSON.stringify({
-        topic: 'realtime:public:rooms:room_id=eq.' + roomId,
-        event: 'phx_join',
-        payload: {},
-        ref: '1'
-      }));
-      // ハートビート（60秒ごと）
-      heartbeatTimer = setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: '0' }));
+  try {
+    // 公式ライブラリでチャンネル作成
+    const channel = window._supabase
+      .channel('room-' + roomId)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',          // INSERT/UPDATE/DELETE全部
+          schema: 'public',
+          table: 'rooms',
+          filter: 'room_id=eq.' + roomId
+        },
+        payload => {
+          if (payload.new) onRoomUpdate(payload.new);
         }
-      }, 30000);
-    };
-
-    ws.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.event === 'phx_reply' && msg.payload?.status === 'ok') {
-          joined = true;
+      )
+      .subscribe(status => {
+        if (status === 'SUBSCRIBED') {
+          setBadge('ok', '🟢 接続中');
           stopPolling(); // Realtime成功したらポーリング不要
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          setBadge('error', '🔴 再接続中...');
+          fallbackPolling(roomId); // 切断時はポーリングにフォールバック
         }
-        // DB変更イベント
-        if (msg.event === 'postgres_changes' || msg.payload?.type === 'UPDATE') {
-          const rec = msg.payload?.data?.record || msg.payload?.record;
-          if (rec) onRoomUpdate(rec);
-        }
-      } catch(e) {}
-    };
+      });
 
-    ws.onerror = () => { setBadge('error', '🔴 切断'); };
-
-    ws.onclose = () => {
-      setBadge('error', '🔴 再接続中...');
-      clearInterval(heartbeatTimer);
-      if (currentRoomId) {
-        // 切断時はポーリングにフォールバック
-        fallbackPolling(roomId);
-        // 5秒後に再接続試みる
-        reconnectTimer = setTimeout(connect, 5000);
-      }
-    };
+    realtimeChannel = channel;
+  } catch(e) {
+    console.error('Realtime接続失敗:', e);
+    fallbackPolling(roomId);
   }
-
-  connect();
-  realtimeChannel = { close: () => {
-    clearInterval(heartbeatTimer);
-    clearTimeout(reconnectTimer);
-    if (ws) try { ws.close(); } catch(e) {}
-  }};
 }
 
 function disconnectRealtime() {
-  if (realtimeChannel) { try { realtimeChannel.close(); } catch(e) {} realtimeChannel = null; }
+  if (realtimeChannel) {
+    try { window._supabase.removeChannel(realtimeChannel); } catch(e) {}
+    realtimeChannel = null;
+  }
   stopPolling();
 }
 
