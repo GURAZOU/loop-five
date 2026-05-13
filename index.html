@@ -407,14 +407,16 @@ function connectRealtime(roomId) {
   disconnectRealtime();
   setBadge('connecting', '⏳ 接続中...');
 
+  // subscribe完了まではポーリングでカバー（race condition対策）
+  fallbackPolling(roomId);
+
   try {
-    // 公式ライブラリでチャンネル作成
     const channel = window._supabase
       .channel('room-' + roomId)
       .on(
         'postgres_changes',
         {
-          event: '*',          // INSERT/UPDATE/DELETE全部
+          event: '*',
           schema: 'public',
           table: 'rooms',
           filter: 'room_id=eq.' + roomId
@@ -426,17 +428,21 @@ function connectRealtime(roomId) {
       .subscribe(status => {
         if (status === 'SUBSCRIBED') {
           setBadge('ok', '🟢 接続中');
-          stopPolling(); // Realtime成功したらポーリング不要
+          stopPolling(); // Realtime確立したらポーリング停止
+          // subscribe完了後に最新状態を即取得（取り逃がし防止）
+          getRoom(roomId).then(room => {
+            if (room) onRoomUpdate(room);
+          }).catch(() => {});
         } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
           setBadge('error', '🔴 再接続中...');
-          fallbackPolling(roomId); // 切断時はポーリングにフォールバック
+          fallbackPolling(roomId);
         }
       });
 
     realtimeChannel = channel;
   } catch(e) {
     console.error('Realtime接続失敗:', e);
-    fallbackPolling(roomId);
+    // すでにfallbackPolling動いてるのでOK
   }
 }
 
@@ -478,7 +484,8 @@ function onRoomUpdate(room) {
     g: room.game_over,
     n: room.player_names,
     v: room.version,
-    s: room.game_started  // game_startedも含める
+    s: room.game_started,  // game_startedも含める
+    r: room.ready_votes    // ready_votesも含める（準備状況の変化を検知）
   });
   if (key === lastSyncKey) return;
   lastSyncKey = key;
