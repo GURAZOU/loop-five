@@ -471,13 +471,14 @@ function setBadge(type, text) {
 // ルーム更新ハンドラ（server state を最優先）
 // ══════════════════════════════════════════
 function onRoomUpdate(room) {
-  // 同期キーで重複処理防止（JSON.stringifyで確実に比較）
+  // 同期キーで重複処理防止
   const key = JSON.stringify({
     b: room.board,
     c: room.current_player,
     g: room.game_over,
     n: room.player_names,
-    v: room.version
+    v: room.version,
+    s: room.game_started  // game_startedも含める
   });
   if (key === lastSyncKey) return;
   lastSyncKey = key;
@@ -486,9 +487,16 @@ function onRoomUpdate(room) {
   const ids   = JSON.parse(room.player_ids   || '[]');
   numPlayers  = room.num_players;
 
-  // ゲーム画面
+  // ゲーム画面が開いていれば同期
   if (document.getElementById('game-screen').style.display !== 'none') {
     syncFromRoom(room);
+    return;
+  }
+
+  // game_startedフラグで全員統一してスタート
+  if (room.game_started) {
+    document.getElementById('ready-area').style.display = 'none';
+    startGame(room);
     return;
   }
 
@@ -496,19 +504,8 @@ function onRoomUpdate(room) {
 
   // 全員揃ったらReady画面表示
   if (filled >= numPlayers) {
-    // ready_votesを確認
     const rVotes = JSON.parse(room.ready_votes || '{}');
     readyVotes = rVotes;
-    const readyCount = Object.keys(rVotes).length;
-
-    // 全員準備OKならゲームスタート
-    if (readyCount >= numPlayers) {
-      document.getElementById('ready-area').style.display = 'none';
-      startGame(room);
-      return;
-    }
-
-    // Ready画面を表示
     showReadyArea(names, ids, rVotes, numPlayers);
     return;
   }
@@ -734,7 +731,8 @@ document.getElementById('join-btn').addEventListener('click', async () => {
 
     const filled = ids.filter(id => id).length;
     if (filled >= numPlayers) {
-      startGame({ ...room, player_names: JSON.stringify(names), player_ids: JSON.stringify(ids) });
+      // 全員揃った → Ready画面へ（startGameはRealtime経由で全員統一）
+      setStatus('全員揃いました！準備OKを押してください', 'success');
     } else {
       setStatus(`参加完了！あと${numPlayers - filled}人待ちです`, 'success');
     }
@@ -784,9 +782,17 @@ document.getElementById('ready-btn').addEventListener('click', async () => {
     rVotes[myClientId] = true;
     readyVotes = rVotes;
     const count = Object.keys(rVotes).length;
-    await updateRoom(roomDbId, { ready_votes: JSON.stringify(rVotes) });
-    document.getElementById('ready-status').textContent = `${count}/${numPlayers}人が準備完了`;
-    // Realtimeで全員OK検知 → startGame
+
+    if (count >= numPlayers) {
+      // 全員準備OK → game_started=true をDBに書いてRealtime経由で全員startGame
+      await updateRoom(roomDbId, {
+        ready_votes: JSON.stringify(rVotes),
+        game_started: true
+      });
+    } else {
+      await updateRoom(roomDbId, { ready_votes: JSON.stringify(rVotes) });
+      document.getElementById('ready-status').textContent = `${count}/${numPlayers}人が準備完了`;
+    }
   } catch(e) {
     document.getElementById('ready-btn').disabled = false;
     console.error(e);
@@ -1237,6 +1243,8 @@ async function doRematch(room) {
       board: '{}',
       current_player: 0,
       game_over: false,
+      game_started: true,  // リマッチは即スタート
+      ready_votes: '{}',
       rematch_votes: '{}'
     }, r.version);
     // startGameはRealtime経由で来る
