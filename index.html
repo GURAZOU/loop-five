@@ -406,6 +406,7 @@ async function updateRoom(id, patch) {
 function connectRealtime(roomId) {
   disconnectRealtime();
   setBadge('connecting', '⏳ 接続中...');
+  lastSyncKey = ''; // 再接続時は必ずリセット（キャッシュ無効化）
 
   // subscribe完了まではポーリングでカバー（race condition対策）
   fallbackPolling(roomId);
@@ -507,17 +508,24 @@ function onRoomUpdate(room) {
     return;
   }
 
-  const filled = ids.filter(id => id).length;
+  // player_namesとplayer_idsの両方で人数を判定（どちらかがnullでも動くように）
+  const filledByIds   = ids.filter(id => id && id.length > 0).length;
+  const filledByNames = names.filter(n => n && n.length > 0).length;
+  const filled = Math.max(filledByIds, filledByNames);
 
   // 全員揃ったらReady画面表示
   if (filled >= numPlayers) {
     const rVotes = JSON.parse(room.ready_votes || '{}');
     readyVotes = rVotes;
+    // ロビー画面を非表示にしてReady表示
+    document.getElementById('waiting-msg').classList.remove('show');
+    document.getElementById('room-id-display').style.display = 'none';
     showReadyArea(names, ids, rVotes, numPlayers);
     return;
   }
 
   if (isHost) {
+    document.getElementById('waiting-msg').classList.add('show');
     document.getElementById('waiting-msg').textContent = `👥 あと${numPlayers - filled}人待ってます...`;
   }
 }
