@@ -224,6 +224,14 @@ const MAX_TILES=15,TIME_NORMAL=30,TIME_ENDGAME=15;
 const TILE_PX=52,GAP_PX=4,MARGIN=3;
 const ZOOM_STEP=0.15,ZOOM_MIN=0.3,ZOOM_MAX=1.5;
 
+
+// ── board操作ヘルパー（バグ防止のため関数化）──
+function setTile(r,c,pi){board[`${r},${c}`]=pi;}
+function removeTile(r,c){delete board[`${r},${c}`];}
+function getTile(r,c){return board[`${r},${c}`];}
+function nextPlayerIndex(){return(current+1)%numPlayers;}
+function refreshUI(){renderBoard();updateTurnMsg();updatePlayerCards();}
+
 // ══════════════════════════════════
 // clientId（同名・reconnect対策）
 // localStorageに保存して再訪時も同じIDを使う
@@ -392,7 +400,7 @@ function syncFromRoom(room){
     if(isMyTurn()){SE.turn();startTimer(endgameMode?TIME_ENDGAME:TIME_NORMAL);}
     else{clearInterval(timerInterval);updateTimerUI(endgameMode?TIME_ENDGAME:TIME_NORMAL);}
   }
-  updatePlayerCards();updateTurnMsg();renderBoard();
+  refreshUI();
 }
 
 // ══════════════════════════════════
@@ -573,7 +581,7 @@ function doRandomPlace(){
   if(!isMyTurn()||gameOver)return;
   if(pickMode||needsPickMode()){
     const ok=Object.keys(board).filter(k=>board[k]===myPlayerIndex);
-    if(ok.length>0){const rk=ok[Math.floor(Math.random()*ok.length)];delete board[rk];placedCounts[myPlayerIndex]--;}
+    if(ok.length>0){const rk=ok[Math.floor(Math.random()*ok.length)];removeTile(...rk.split(',').map(Number));placedCounts[myPlayerIndex]--;}
     pickMode=false;pendingPlace=null;document.getElementById('pick-msg').classList.remove('show');
   }
   previewPos=null;showConfirmBar(false);
@@ -655,14 +663,14 @@ document.getElementById('confirm-cancel').addEventListener('click',()=>{previewP
 function onPickTile(e){
   if(!pickMode)return;
   const r=parseInt(e.currentTarget.dataset.r),c=parseInt(e.currentTarget.dataset.c);
-  delete board[`${r},${c}`];placedCounts[myPlayerIndex]--;pickMode=false;
+  removeTile(r,c);placedCounts[myPlayerIndex]--;pickMode=false;
   document.getElementById('pick-msg').classList.remove('show');
   if(pendingPlace){const{r:pr,c:pc}=pendingPlace;pendingPlace=null;placeTile(pr,pc);}
   else{updateTurnMsg();renderBoard();}
 }
 function placeTile(r,c,isRandom=false){
   previewPos=null;showConfirmBar(false);
-  board[`${r},${c}`]=myPlayerIndex;placedCounts[myPlayerIndex]++;
+  setTile(r,c,myPlayerIndex);placedCounts[myPlayerIndex]++;
   totalPlaced[myPlayerIndex]=(totalPlaced[myPlayerIndex]||0)+1;
   lastMoves[myPlayerIndex]={r,c};
   expandGrid(r,c);renderBoard();SE.place();vib(50);
@@ -678,14 +686,14 @@ function placeTile(r,c,isRandom=false){
 // DB書き込み
 // ══════════════════════════════════
 async function pushTurn(){
-  const next=(current+1)%numPlayers;
+  const next=nextPlayerIndex();
   try{await updateRoom(roomDbId,{board:JSON.stringify(board),current_player:next});}
   catch(e){console.error(e);}
 }
 async function pushWin(){
   try{
     await updateRoom(roomDbId,{board:JSON.stringify(board),
-      current_player:(myPlayerIndex+1)%numPlayers,game_over:true,rematch_votes:'{}'});
+      current_player:nextPlayerIndex(),game_over:true,rematch_votes:'{}'});
     SE.win();vib([100,50,100]);launchConfetti();showWin(myPlayerIndex);
   }catch(e){console.error(e);}
 }
